@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Ecommerce — {{ environment }}</title>
+  <style>
+    :root {
+      --aws-orange: #FF9900;
+      --aws-dark: #232F3E;
+      --healthy: #1d8348;
+      --degraded: #c0392b;
+      --card-bg: #f9f9f9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Amazon Ember', Arial, sans-serif; background: #eaecef; color: #333; }
+    header {
+      background: var(--aws-dark);
+      color: #fff;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.4rem; color: var(--aws-orange); }
+    .env-badge {
+      background: var(--aws-orange);
+      color: var(--aws-dark);
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .info-bar {
+      background: var(--aws-dark);
+      color: #aaa;
+      font-size: 0.78rem;
+      padding: 6px 32px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .info-bar span { color: #fff; }
+    .status-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .healthy { background: var(--healthy); }
+    .degraded { background: var(--degraded); }
+    main { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    .infra-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .card h3 { font-size: 0.75rem; text-transform: uppercase; color: #777; margin-bottom: 8px; }
+    .card p { font-size: 1rem; font-weight: 600; word-break: break-all; }
+    .card .status-label {
+      display: flex;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      transition: box-shadow 0.2s;
+    }
+    .product-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .product-card .category {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .product-card h4 { font-size: 1rem; margin-bottom: 8px; }
+    .product-card .price {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--aws-dark);
+    }
+    .product-card .stock { font-size: 0.8rem; color: #666; margin-top: 4px; }
+    .product-card button {
+      margin-top: 14px;
+      width: 100%;
+      background: var(--aws-orange);
+      border: none;
+      border-radius: 4px;
+      padding: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .product-card button:hover { background: #e08c00; }
+    h2 { margin-bottom: 16px; font-size: 1.1rem; color: var(--aws-dark); }
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AWS Ecommerce Store</h1>
+    <span class="env-badge">{{ environment | upper }}</span>
+  </header>
+
+  <div class="info-bar">
+    <div>Instance: <span>{{ instance_id }}</span></div>
+    <div>AZ: <span>{{ az }}</span></div>
+    <div>Uptime: <span>{{ uptime }}s</span></div>
+    <div>Cache: <span>{{ "HIT" if cache_hit else "MISS" }}</span></div>
+  </div>
+
+  <main>
+    <div class="infra-cards">
+      <div class="card">
+        <h3>Instance ID</h3>
+        <p>{{ instance_id }}</p>
+      </div>
+      <div class="card">
+        <h3>Availability Zone</h3>
+        <p>{{ az }}</p>
+      </div>
+      <div class="card">
+        <h3>Database Status</h3>
+        <div class="status-label">
+          <span class="status-dot {% if db_status == 'healthy' %}healthy{% else %}degraded{% endif %}"></span>
+          {{ db_status | capitalize }}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Cache Status</h3>
+        <div class="status-label">
+          <span class="status-dot {% if redis_status == 'healthy' %}healthy{% else %}degraded{% endif %}"></span>
+          {{ redis_status | capitalize }}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Uptime</h3>
+        <p>{{ uptime }} seconds</p>
+      </div>
+      <div class="card">
+        <h3>Health Endpoint</h3>
+        <p><a href="/health">/health</a></p>
+      </div>
+    </div>
+
+    <h2>Product Catalogue ({{ products | length }} items)</h2>
+    <div class="products-grid">
+      {% for product in products %}
+      <div class="product-card">
+        <div class="category">{{ product.category }}</div>
+        <h4>{{ product.name }}</h4>
+        <div class="price">${{ "%.2f" | format(product.price) }}</div>
+        <div class="stock">{{ product.stock }} in stock</div>
+        <button onclick="addToCart({{ product.id }})">Add to Cart</button>
+      </div>
+      {% endfor %}
+    </div>
+  </main>
+
+  <footer>
+    Served by <strong>{{ instance_id }}</strong> in <strong>{{ az }}</strong> &mdash;
+    Environment: <strong>{{ environment }}</strong> &mdash;
+    Infrastructure managed by Terraform
+  </footer>
+
+  <script>
+    async function addToCart(productId) {
+      const res = await fetch(`/api/cart?session=demo-${Date.now()}`, {
+        method: 'POST',
+        body: JSON.stringify({ product_id: productId, quantity: 1 }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      alert(data.status === 'ok' ? `Added product ${productId} to cart!` : `Error: ${data.error}`);
+    }
+  </script>
+</body>
+</html>

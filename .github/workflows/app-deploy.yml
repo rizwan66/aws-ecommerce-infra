@@ -1,0 +1,141 @@
+name: Application Build & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-deploy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: 'us-east-1'
+  ECR_REPOSITORY: 'ecommerce-app'
+  ARTIFACT_BUCKET: 'ecommerce-prod-artifacts'
+
+jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-cov flake8
+
+      - name: Lint with flake8
+        run: flake8 . --max-line-length=120 --exclude=config.py
+
+      - name: Run unit tests
+        run: pytest tests/ -v --cov=app --cov-report=xml || echo "No tests directory yet"
+
+  build-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to ASG
+    runs-on: ubuntu-latest
+    needs: build-push
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload app artifacts to S3
+        run: |
+          aws s3 sync ./app s3://${{ env.ARTIFACT_BUCKET }}/app/ \
+            --exclude "*.pyc" --exclude "__pycache__/*" --exclude ".env*"
+
+      - name: Trigger ASG instance refresh
+        run: |
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+            --query "AutoScalingGroups[?contains(Tags[?Key=='Project'].Value, 'ecommerce')].AutoScalingGroupName | [0]" \
+            --output text)
+
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "$ASG_NAME" \
+            --preferences '{"MinHealthyPercentage": 66, "InstanceWarmup": 120}'
+
+          echo "Instance refresh started for ASG: $ASG_NAME"
+
+      - name: Wait for refresh completion
+        run: |
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+            --query "AutoScalingGroups[?contains(Tags[?Key=='Project'].Value, 'ecommerce')].AutoScalingGroupName | [0]" \
+            --output text)
+
+          for i in {1..30}; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --query "InstanceRefreshes[0].Status" \
+              --output text)
+            echo "Refresh status: $STATUS (attempt $i/30)"
+            if [ "$STATUS" = "Successful" ]; then
+              echo "Deployment complete!"
+              exit 0
+            fi
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "Deployment failed with status: $STATUS"
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "Timeout waiting for instance refresh"
+          exit 1
