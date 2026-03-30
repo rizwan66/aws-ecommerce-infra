@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system deps for psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

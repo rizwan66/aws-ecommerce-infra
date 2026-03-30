@@ -42,6 +42,9 @@ results.sarif
 tfsec-report*
 checkov-report*
 
+# Local dev environment (contains passwords)
+.env.local
+
 # Secrets (never commit these)
 *.pem
 *.key

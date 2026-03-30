@@ -28,7 +28,7 @@ try:
     from config import INSTANCE_ID, AZ, ENVIRONMENT, DB_HOST, DB_NAME, DB_USER, DB_PASS, REDIS_HOST, REDIS_PORT
 except ImportError:
     # Fallback for local dev
-    INSTANCE_ID = os.getenv("INSTANCE_ID", "local")
+    INSTANCE_ID = os.getenv("INSTANCE_ID", "local-dev")
     AZ = os.getenv("AZ", "local")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
     DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -37,6 +37,11 @@ except ImportError:
     DB_PASS = os.getenv("DB_PASS", "")
     REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
+# SSL is required on AWS (RDS + ElastiCache enforce it).
+# Disable for local Docker dev where services run without TLS.
+DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")
+REDIS_SSL = os.getenv("REDIS_SSL", "true").lower() == "true"
 
 START_TIME = time.time()
 
@@ -55,13 +60,13 @@ PRODUCTS = [
 def _get_db_conn():
     return psycopg2.connect(
         host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASS,
-        connect_timeout=3, sslmode="require"
+        connect_timeout=3, sslmode=DB_SSL_MODE
     )
 
 
 def _get_redis():
     return redis.Redis(
-        host=REDIS_HOST, port=REDIS_PORT, ssl=True,
+        host=REDIS_HOST, port=REDIS_PORT, ssl=REDIS_SSL,
         socket_connect_timeout=3, decode_responses=True
     )
 
