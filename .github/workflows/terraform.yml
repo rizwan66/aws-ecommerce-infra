@@ -136,12 +136,12 @@ jobs:
           terraform plan \
             -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
             -out=tfplan \
-            -detailed-exitcode 2>&1 | tee plan_output.txt
-          TF_EXIT=${PIPESTATUS[0]}
+            -detailed-exitcode > plan_output.txt 2>&1
+          TF_EXIT=$?
           set -e
+          cat plan_output.txt
           echo "exitcode=$TF_EXIT" >> $GITHUB_OUTPUT
           echo "Terraform plan exit code: $TF_EXIT"
-          exit 0
         continue-on-error: true
 
       - name: Upload plan artifact
