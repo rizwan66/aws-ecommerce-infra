@@ -40,8 +40,8 @@ module "vpc" {
 module "iam" {
   source = "./modules/iam"
 
-  name_prefix        = local.name_prefix
-  db_secret_arn      = aws_secretsmanager_secret.db_password.arn
+  name_prefix   = local.name_prefix
+  db_secret_arn = aws_secretsmanager_secret.db_password.arn
 }
 
 # ─── Security Groups ──────────────────────────────────────────────────────────
@@ -67,16 +67,16 @@ module "alb" {
 module "ec2" {
   source = "./modules/ec2"
 
-  name_prefix          = local.name_prefix
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  app_sg_id            = module.security.app_sg_id
-  instance_type        = var.app_instance_type
-  desired_capacity     = var.app_instance_count
-  min_size             = var.app_min_size
-  max_size             = var.app_max_size
-  target_group_arn     = module.alb.target_group_arn
-  iam_instance_profile = module.iam.instance_profile_name
+  name_prefix           = local.name_prefix
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  app_sg_id             = module.security.app_sg_id
+  instance_type         = var.app_instance_type
+  desired_capacity      = var.app_instance_count
+  min_size              = var.app_min_size
+  max_size              = var.app_max_size
+  target_group_arn      = module.alb.target_group_arn
+  iam_instance_profile  = module.iam.instance_profile_name
   db_secret_arn         = aws_secretsmanager_secret.db_password.arn
   db_endpoint           = module.rds.endpoint
   redis_endpoint        = module.elasticache.endpoint
@@ -91,39 +91,40 @@ module "ec2" {
 module "rds" {
   source = "./modules/rds"
 
-  name_prefix          = local.name_prefix
-  vpc_id               = module.vpc.vpc_id
-  data_subnet_ids      = module.vpc.data_subnet_ids
-  db_sg_id             = module.security.db_sg_id
-  instance_class       = var.db_instance_class
-  allocated_storage    = var.db_allocated_storage
-  db_name              = var.db_name
-  db_username          = var.db_username
-  db_password          = random_password.db_password.result
-  environment          = var.environment
+  name_prefix       = local.name_prefix
+  vpc_id            = module.vpc.vpc_id
+  data_subnet_ids   = module.vpc.data_subnet_ids
+  db_sg_id          = module.security.db_sg_id
+  instance_class    = var.db_instance_class
+  allocated_storage = var.db_allocated_storage
+  db_name           = var.db_name
+  db_username       = var.db_username
+  db_password       = random_password.db_password.result
+  environment       = var.environment
 }
 
 # ─── ElastiCache Redis ────────────────────────────────────────────────────────
 module "elasticache" {
   source = "./modules/elasticache"
 
-  name_prefix        = local.name_prefix
-  vpc_id             = module.vpc.vpc_id
-  data_subnet_ids    = module.vpc.data_subnet_ids
-  cache_sg_id        = module.security.cache_sg_id
-  node_type          = var.cache_node_type
-  num_cache_nodes    = var.cache_num_nodes
+  name_prefix     = local.name_prefix
+  vpc_id          = module.vpc.vpc_id
+  data_subnet_ids = module.vpc.data_subnet_ids
+  cache_sg_id     = module.security.cache_sg_id
+  node_type       = var.cache_node_type
+  num_cache_nodes = var.cache_num_nodes
 }
 
 # ─── Monitoring & Alerting ────────────────────────────────────────────────────
 module "monitoring" {
   source = "./modules/monitoring"
 
-  name_prefix     = local.name_prefix
-  asg_name        = module.ec2.asg_name
-  alb_arn_suffix  = module.alb.alb_arn_suffix
-  tg_arn_suffix   = module.alb.tg_arn_suffix
-  rds_identifier  = module.rds.identifier
-  alert_email     = var.alert_email
-  environment     = var.environment
+  name_prefix                      = local.name_prefix
+  asg_name                         = module.ec2.asg_name
+  alb_arn_suffix                   = module.alb.alb_arn_suffix
+  tg_arn_suffix                    = module.alb.tg_arn_suffix
+  rds_identifier                   = module.rds.identifier
+  alert_email                      = var.alert_email
+  environment                      = var.environment
+  elasticache_replication_group_id = module.elasticache.replication_group_id
 }

@@ -2,12 +2,12 @@ name: Application Build & Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'app/**'
       - '.github/workflows/app-deploy.yml'
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - 'app/**'
 
@@ -18,7 +18,7 @@ permissions:
 env:
   AWS_REGION: 'us-east-1'
   ECR_REPOSITORY: 'ecommerce-app'
-  ARTIFACT_BUCKET: 'ecommerce-prod-artifacts'
+  ARTIFACT_BUCKET: 'ecommerce-prod-artifacts-677746514416'
 
 jobs:
   test:
