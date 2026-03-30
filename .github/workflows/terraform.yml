@@ -136,7 +136,8 @@ jobs:
             -var="alert_email=${{ secrets.ALERT_EMAIL }}" \
             -out=tfplan \
             -detailed-exitcode 2>&1 | tee plan_output.txt
-          echo "exitcode=$?" >> $GITHUB_OUTPUT
+          TF_EXIT=${PIPESTATUS[0]}
+          echo "exitcode=$TF_EXIT" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Upload plan artifact
