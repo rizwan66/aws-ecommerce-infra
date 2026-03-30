@@ -4,6 +4,7 @@ locals {
 
 # ─── Secrets Manager: DB password ─────────────────────────────────────────────
 resource "aws_secretsmanager_secret" "db_password" {
+  #checkov:skip=CKV_AWS_149:Using AWS-managed encryption key - CMK not required for this environment
   name                    = "${local.name_prefix}/db-password"
   description             = "RDS master password"
   recovery_window_in_days = 7

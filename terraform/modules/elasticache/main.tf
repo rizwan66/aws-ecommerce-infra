@@ -17,6 +17,8 @@ resource "aws_elasticache_parameter_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "main" {
+  #checkov:skip=CKV_AWS_31:Auth token not required - Redis is accessible only within the VPC via security groups
+  #checkov:skip=CKV_AWS_191:Using AWS-managed encryption key - CMK not required for this environment
   replication_group_id = "${var.name_prefix}-redis"
   description          = "Redis cluster for ${var.name_prefix}"
 

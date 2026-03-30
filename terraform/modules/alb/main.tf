@@ -1,4 +1,5 @@
 resource "aws_lb" "main" {
+  #checkov:skip=CKV_AWS_150:Deletion protection disabled - non-production, Terraform-managed environment
   name               = "${var.name_prefix}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -7,6 +8,7 @@ resource "aws_lb" "main" {
 
   enable_deletion_protection = false
   enable_http2               = true
+  drop_invalid_header_fields = true
 
   access_logs {
     bucket  = aws_s3_bucket.alb_logs.bucket
@@ -84,6 +86,7 @@ resource "aws_lb_target_group" "app" {
 
 # ─── Listeners ────────────────────────────────────────────────────────────────
 resource "aws_lb_listener" "http" {
+  #checkov:skip=CKV_AWS_2:HTTP listener - no ACM certificate configured; switch to HTTPS when domain is set up
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
@@ -112,6 +115,7 @@ resource "aws_lb_listener" "http" {
 
 # Temporary HTTP forward for demo (replace with HTTPS listener in production)
 resource "aws_lb_listener" "http_forward" {
+  #checkov:skip=CKV_AWS_2:HTTP listener on port 8080 - no ACM certificate configured; replace with HTTPS when domain is set up
   load_balancer_arn = aws_lb.main.arn
   port              = 8080
   protocol          = "HTTP"
