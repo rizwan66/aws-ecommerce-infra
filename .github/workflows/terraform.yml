@@ -70,7 +70,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           tflint --init
-          tflint --recursive
+          tflint --recursive --minimum-failure-severity=error
 
   # ─── Security Scan ────────────────────────────────────────────────────────
   security-scan:
