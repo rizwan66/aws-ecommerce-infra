@@ -137,7 +137,10 @@ resource "aws_iam_role_policy" "github_actions" {
           "iam:PassRole",
           "secretsmanager:GetSecretValue",
           "s3:*",
-          "config:*"
+          "config:*",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem"
         ]
         Resource = "*"
       }
