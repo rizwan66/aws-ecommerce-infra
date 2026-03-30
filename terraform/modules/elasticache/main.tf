@@ -26,9 +26,9 @@ resource "aws_elasticache_replication_group" "main" {
   subnet_group_name    = aws_elasticache_subnet_group.main.name
   security_group_ids   = [var.cache_sg_id]
 
-  engine               = "redis"
-  engine_version       = "7.1"
-  port                 = 6379
+  engine         = "redis"
+  engine_version = "7.1"
+  port           = 6379
 
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true

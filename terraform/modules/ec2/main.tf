@@ -77,10 +77,10 @@ data "aws_region" "current" {}
 
 # ─── Auto Scaling Group ───────────────────────────────────────────────────────
 resource "aws_autoscaling_group" "app" {
-  name                = "${var.name_prefix}-app-asg"
-  vpc_zone_identifier = var.private_subnet_ids
-  target_group_arns   = [var.target_group_arn]
-  health_check_type   = "ELB"
+  name                      = "${var.name_prefix}-app-asg"
+  vpc_zone_identifier       = var.private_subnet_ids
+  target_group_arns         = [var.target_group_arn]
+  health_check_type         = "ELB"
   health_check_grace_period = 120
 
   min_size         = var.min_size

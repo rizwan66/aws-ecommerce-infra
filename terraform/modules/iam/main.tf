@@ -23,9 +23,9 @@ resource "aws_iam_role_policy" "ec2_custom" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SecretsManagerAccess"
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Sid      = "SecretsManagerAccess"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = [var.db_secret_arn]
       },
       {
@@ -50,9 +50,9 @@ resource "aws_iam_role_policy" "ec2_custom" {
         Resource = "arn:aws:logs:*:*:*"
       },
       {
-        Sid    = "EC2Metadata"
-        Effect = "Allow"
-        Action = ["ec2:DescribeInstances", "ec2:DescribeTags"]
+        Sid      = "EC2Metadata"
+        Effect   = "Allow"
+        Action   = ["ec2:DescribeInstances", "ec2:DescribeTags"]
         Resource = "*"
       },
       {

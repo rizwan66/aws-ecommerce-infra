@@ -45,9 +45,9 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p50",  label = "P50", color = "#2ca02c" }],
-            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p95",  label = "P95", color = "#ff7f0e" }],
-            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p99",  label = "P99", color = "#d62728" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p50", label = "P50", color = "#2ca02c" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p95", label = "P95", color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p99", label = "P99", color = "#d62728" }],
             ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p100", label = "Max", color = "#9467bd" }]
           ]
           yAxis = { left = { label = "seconds", min = 0 } }
@@ -72,10 +72,10 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/ApplicationELB", "RequestCount",             "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Total",       color = "#1f77b4" }],
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Total", color = "#1f77b4" }],
             ["AWS/ApplicationELB", "HTTPCode_Target_2XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "2xx Success", color = "#2ca02c" }],
-            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "4xx Client",  color = "#ff7f0e" }],
-            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "5xx Server",  color = "#d62728" }]
+            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "4xx Client", color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "5xx Server", color = "#d62728" }]
           ]
           yAxis = { left = { label = "requests / min", min = 0 } }
         }
@@ -96,14 +96,14 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count",    "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "ALB 5xx",       color = "#d62728" }],
-            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "Target 5xx",    color = "#ff7f0e" }],
-            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "Target 4xx",    color = "#bcbd22" }],
-            ["AWS/ApplicationELB", "UnHealthyHostCount",        "TargetGroup",  var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Maximum", label = "Unhealthy Hosts", color = "#9467bd", yAxis = "right" }]
+            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "ALB 5xx", color = "#d62728" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Target 5xx", color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Target 4xx", color = "#bcbd22" }],
+            ["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Maximum", label = "Unhealthy Hosts", color = "#9467bd", yAxis = "right" }]
           ]
           yAxis = {
             left  = { label = "error count / min", min = 0 }
-            right = { label = "unhealthy hosts",   min = 0 }
+            right = { label = "unhealthy hosts", min = 0 }
           }
           annotations = {
             horizontal = [{ label = "Alert threshold", value = 10, color = "#d62728" }]
@@ -151,9 +151,9 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/AutoScaling", "GroupInServiceInstances",  "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "In Service",  color = "#2ca02c" }],
-            ["AWS/AutoScaling", "GroupPendingInstances",    "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Pending",      color = "#ff7f0e" }],
-            ["AWS/AutoScaling", "GroupTerminatingInstances","AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Terminating",  color = "#d62728" }]
+            ["AWS/AutoScaling", "GroupInServiceInstances", "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "In Service", color = "#2ca02c" }],
+            ["AWS/AutoScaling", "GroupPendingInstances", "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Pending", color = "#ff7f0e" }],
+            ["AWS/AutoScaling", "GroupTerminatingInstances", "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Terminating", color = "#d62728" }]
           ]
           yAxis = { left = { label = "instances", min = 0 } }
           annotations = {
@@ -176,12 +176,12 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/RDS", "CPUUtilization",      "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "CPU %",      color = "#1f77b4" }],
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "CPU %", color = "#1f77b4" }],
             ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Connections", color = "#ff7f0e", yAxis = "right" }]
           ]
           yAxis = {
-            left  = { label = "cpu percent",  min = 0, max = 100 }
-            right = { label = "connections",  min = 0 }
+            left  = { label = "cpu percent", min = 0, max = 100 }
+            right = { label = "connections", min = 0 }
           }
           annotations = {
             horizontal = [{ label = "CPU alert at 80%", value = 80, color = "#d62728" }]
@@ -204,12 +204,12 @@ resource "aws_cloudwatch_dashboard" "main" {
           stacked = false
           metrics = [
             ["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", var.rds_identifier, { stat = "Minimum", label = "Free Storage (bytes)", color = "#2ca02c" }],
-            ["AWS/RDS", "ReadIOPS",         "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read IOPS",             color = "#1f77b4", yAxis = "right" }],
-            ["AWS/RDS", "WriteIOPS",        "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write IOPS",            color = "#ff7f0e", yAxis = "right" }]
+            ["AWS/RDS", "ReadIOPS", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read IOPS", color = "#1f77b4", yAxis = "right" }],
+            ["AWS/RDS", "WriteIOPS", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write IOPS", color = "#ff7f0e", yAxis = "right" }]
           ]
           yAxis = {
             left  = { label = "bytes free", min = 0 }
-            right = { label = "iops",       min = 0 }
+            right = { label = "iops", min = 0 }
           }
           annotations = {
             horizontal = [{ label = "Alert < 2 GB", value = 2147483648, color = "#d62728" }]
@@ -231,7 +231,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/ApplicationELB", "HealthyHostCount",   "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Minimum", label = "Healthy",   color = "#2ca02c" }],
+            ["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Minimum", label = "Healthy", color = "#2ca02c" }],
             ["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Maximum", label = "Unhealthy", color = "#d62728" }]
           ]
           yAxis = { left = { label = "hosts", min = 0 } }
@@ -253,7 +253,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           stacked = false
           metrics = [
             ["AWS/ApplicationELB", "ActiveConnectionCount", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Active", color = "#1f77b4" }],
-            ["AWS/ApplicationELB", "NewConnectionCount",    "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "New",    color = "#ff7f0e" }]
+            ["AWS/ApplicationELB", "NewConnectionCount", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "New", color = "#ff7f0e" }]
           ]
           yAxis = { left = { label = "connections", min = 0 } }
         }
@@ -273,14 +273,14 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
           stacked = false
           metrics = [
-            ["AWS/RDS", "NetworkReceiveThroughput",  "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network In",        color = "#1f77b4" }],
-            ["AWS/RDS", "NetworkTransmitThroughput", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network Out",       color = "#ff7f0e" }],
-            ["AWS/RDS", "ReadLatency",               "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read Latency (s)",  color = "#2ca02c", yAxis = "right" }],
-            ["AWS/RDS", "WriteLatency",              "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write Latency (s)", color = "#d62728", yAxis = "right" }]
+            ["AWS/RDS", "NetworkReceiveThroughput", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network In", color = "#1f77b4" }],
+            ["AWS/RDS", "NetworkTransmitThroughput", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network Out", color = "#ff7f0e" }],
+            ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read Latency (s)", color = "#2ca02c", yAxis = "right" }],
+            ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write Latency (s)", color = "#d62728", yAxis = "right" }]
           ]
           yAxis = {
             left  = { label = "bytes/sec", min = 0 }
-            right = { label = "seconds",   min = 0 }
+            right = { label = "seconds", min = 0 }
           }
         }
       }
