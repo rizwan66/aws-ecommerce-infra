@@ -59,12 +59,13 @@ resource "aws_launch_template" "app" {
   }
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
-    db_secret_arn  = var.db_secret_arn
-    db_endpoint    = var.db_endpoint
-    redis_endpoint = var.redis_endpoint
-    environment    = var.environment
-    project_name   = var.project_name
-    aws_region     = data.aws_region.current.name
+    db_secret_arn         = var.db_secret_arn
+    db_endpoint           = var.db_endpoint
+    redis_endpoint        = var.redis_endpoint
+    environment           = var.environment
+    project_name          = var.project_name
+    aws_region            = data.aws_region.current.name
+    artifacts_bucket_name = var.artifacts_bucket_name
   }))
 
   lifecycle {
@@ -126,6 +127,8 @@ resource "aws_autoscaling_policy" "cpu_scale_out" {
 
 # ─── Request Count Scaling Policy ─────────────────────────────────────────────
 resource "aws_autoscaling_policy" "request_count" {
+  count = var.alb_arn_suffix != "" && var.tg_arn_suffix != "" ? 1 : 0
+
   name                   = "${var.name_prefix}-request-count"
   autoscaling_group_name = aws_autoscaling_group.app.name
   policy_type            = "TargetTrackingScaling"

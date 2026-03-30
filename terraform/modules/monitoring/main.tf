@@ -16,89 +16,275 @@ resource "aws_cloudwatch_dashboard" "main" {
 
   dashboard_body = jsonencode({
     widgets = [
+
+      # ── Section header: Golden Signals ─────────────────────────────────────
       {
-        type = "metric"
+        type   = "text"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 1
         properties = {
-          title  = "ALB Request Count"
-          period = 60
-          stat   = "Sum"
-          metrics = [["AWS/ApplicationELB", "RequestCount",
-            "LoadBalancer", var.alb_arn_suffix]]
+          markdown = "## Golden Signals — Latency | Traffic | Errors | Saturation"
         }
       },
+
+      # ── SIGNAL 1: LATENCY ──────────────────────────────────────────────────
+      # How long it takes to service a request.
+      # P50/P95/P99 on the same graph reveals latency distribution.
       {
-        type = "metric"
+        type   = "metric"
+        x      = 0
+        y      = 1
+        width  = 8
+        height = 6
         properties = {
-          title  = "ALB Response Time (P99)"
-          period = 60
-          stat   = "p99"
-          metrics = [["AWS/ApplicationELB", "TargetResponseTime",
-            "LoadBalancer", var.alb_arn_suffix,
-            "TargetGroup", var.tg_arn_suffix]]
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "ALB 5xx Errors"
-          period = 60
-          stat   = "Sum"
-          metrics = [["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count",
-            "LoadBalancer", var.alb_arn_suffix]]
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "ASG Instance Count"
-          period = 60
-          stat   = "Average"
-          metrics = [["AWS/AutoScaling", "GroupInServiceInstances",
-            "AutoScalingGroupName", var.asg_name]]
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "ASG CPU Utilization"
-          period = 60
-          stat   = "Average"
-          metrics = [["AWS/EC2", "CPUUtilization",
-            "AutoScalingGroupName", var.asg_name]]
-        }
-      },
-      {
-        type = "metric"
-        properties = {
-          title  = "RDS CPU & Connections"
-          period = 60
+          title   = "[Latency] Target Response Time"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
           metrics = [
-            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average" }],
-            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", yAxis = "right" }]
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p50",  label = "P50", color = "#2ca02c" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p95",  label = "P95", color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p99",  label = "P99", color = "#d62728" }],
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix, "TargetGroup", var.tg_arn_suffix, { stat = "p100", label = "Max", color = "#9467bd" }]
           ]
+          yAxis = { left = { label = "seconds", min = 0 } }
+          annotations = {
+            horizontal = [{ label = "SLO 500ms", value = 0.5, color = "#d62728" }]
+          }
         }
       },
+
+      # ── SIGNAL 2: TRAFFIC ──────────────────────────────────────────────────
+      # How much demand is being placed on the system (requests per minute).
       {
-        type = "metric"
+        type   = "metric"
+        x      = 8
+        y      = 1
+        width  = 8
+        height = 6
         properties = {
-          title  = "Healthy Host Count"
-          period = 60
-          stat   = "Minimum"
-          metrics = [["AWS/ApplicationELB", "HealthyHostCount",
-            "TargetGroup", var.tg_arn_suffix,
-            "LoadBalancer", var.alb_arn_suffix]]
+          title   = "[Traffic] Requests by Status Class"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ApplicationELB", "RequestCount",             "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Total",       color = "#1f77b4" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_2XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "2xx Success", color = "#2ca02c" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "4xx Client",  color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "5xx Server",  color = "#d62728" }]
+          ]
+          yAxis = { left = { label = "requests / min", min = 0 } }
         }
       },
+
+      # ── SIGNAL 3: ERRORS ───────────────────────────────────────────────────
+      # The rate of requests that fail (5xx from ALB and app targets).
       {
-        type = "metric"
+        type   = "metric"
+        x      = 16
+        y      = 1
+        width  = 8
+        height = 6
         properties = {
-          title  = "RDS Free Storage"
-          period = 300
-          stat   = "Minimum"
-          metrics = [["AWS/RDS", "FreeStorageSpace",
-            "DBInstanceIdentifier", var.rds_identifier]]
+          title   = "[Errors] 5xx Rate & Unhealthy Hosts"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count",    "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "ALB 5xx",       color = "#d62728" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "Target 5xx",    color = "#ff7f0e" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", var.alb_arn_suffix,                                                                    { stat = "Sum",     label = "Target 4xx",    color = "#bcbd22" }],
+            ["AWS/ApplicationELB", "UnHealthyHostCount",        "TargetGroup",  var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Maximum", label = "Unhealthy Hosts", color = "#9467bd", yAxis = "right" }]
+          ]
+          yAxis = {
+            left  = { label = "error count / min", min = 0 }
+            right = { label = "unhealthy hosts",   min = 0 }
+          }
+          annotations = {
+            horizontal = [{ label = "Alert threshold", value = 10, color = "#d62728" }]
+          }
+        }
+      },
+
+      # ── SIGNAL 4: SATURATION — EC2 CPU ─────────────────────────────────────
+      # How full the app tier is; triggers auto-scaling at 70%.
+      {
+        type   = "metric"
+        x      = 0
+        y      = 7
+        width  = 6
+        height = 6
+        properties = {
+          title   = "[Saturation] EC2 CPU Utilization"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Avg CPU", color = "#1f77b4" }],
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", var.asg_name, { stat = "Maximum", label = "Max CPU", color = "#d62728" }]
+          ]
+          yAxis = { left = { label = "percent", min = 0, max = 100 } }
+          annotations = {
+            horizontal = [{ label = "Scale-out at 70%", value = 70, color = "#ff7f0e" }]
+          }
+        }
+      },
+
+      # ── SIGNAL 4: SATURATION — ASG Scale ───────────────────────────────────
+      # Horizontal scaling head-room: how close to max capacity.
+      {
+        type   = "metric"
+        x      = 6
+        y      = 7
+        width  = 6
+        height = 6
+        properties = {
+          title   = "[Saturation] ASG Instance Count"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/AutoScaling", "GroupInServiceInstances",  "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "In Service",  color = "#2ca02c" }],
+            ["AWS/AutoScaling", "GroupPendingInstances",    "AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Pending",      color = "#ff7f0e" }],
+            ["AWS/AutoScaling", "GroupTerminatingInstances","AutoScalingGroupName", var.asg_name, { stat = "Average", label = "Terminating",  color = "#d62728" }]
+          ]
+          yAxis = { left = { label = "instances", min = 0 } }
+          annotations = {
+            horizontal = [{ label = "Max capacity (9)", value = 9, color = "#d62728" }]
+          }
+        }
+      },
+
+      # ── SIGNAL 4: SATURATION — RDS CPU & Connections ───────────────────────
+      {
+        type   = "metric"
+        x      = 12
+        y      = 7
+        width  = 6
+        height = 6
+        properties = {
+          title   = "[Saturation] RDS CPU & Connections"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/RDS", "CPUUtilization",      "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "CPU %",      color = "#1f77b4" }],
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Connections", color = "#ff7f0e", yAxis = "right" }]
+          ]
+          yAxis = {
+            left  = { label = "cpu percent",  min = 0, max = 100 }
+            right = { label = "connections",  min = 0 }
+          }
+          annotations = {
+            horizontal = [{ label = "CPU alert at 80%", value = 80, color = "#d62728" }]
+          }
+        }
+      },
+
+      # ── SIGNAL 4: SATURATION — RDS Disk & IOPS ─────────────────────────────
+      {
+        type   = "metric"
+        x      = 18
+        y      = 7
+        width  = 6
+        height = 6
+        properties = {
+          title   = "[Saturation] RDS Free Storage & IOPS"
+          region  = data.aws_region.current.name
+          period  = 300
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", var.rds_identifier, { stat = "Minimum", label = "Free Storage (bytes)", color = "#2ca02c" }],
+            ["AWS/RDS", "ReadIOPS",         "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read IOPS",             color = "#1f77b4", yAxis = "right" }],
+            ["AWS/RDS", "WriteIOPS",        "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write IOPS",            color = "#ff7f0e", yAxis = "right" }]
+          ]
+          yAxis = {
+            left  = { label = "bytes free", min = 0 }
+            right = { label = "iops",       min = 0 }
+          }
+          annotations = {
+            horizontal = [{ label = "Alert < 2 GB", value = 2147483648, color = "#d62728" }]
+          }
+        }
+      },
+
+      # ── CONTEXT: Healthy / Unhealthy Hosts ─────────────────────────────────
+      {
+        type   = "metric"
+        x      = 0
+        y      = 13
+        width  = 8
+        height = 6
+        properties = {
+          title   = "[Context] Healthy vs Unhealthy Hosts"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ApplicationELB", "HealthyHostCount",   "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Minimum", label = "Healthy",   color = "#2ca02c" }],
+            ["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", var.tg_arn_suffix, "LoadBalancer", var.alb_arn_suffix, { stat = "Maximum", label = "Unhealthy", color = "#d62728" }]
+          ]
+          yAxis = { left = { label = "hosts", min = 0 } }
+        }
+      },
+
+      # ── CONTEXT: ALB Connection Depth ──────────────────────────────────────
+      {
+        type   = "metric"
+        x      = 8
+        y      = 13
+        width  = 8
+        height = 6
+        properties = {
+          title   = "[Context] ALB Active & New Connections"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ApplicationELB", "ActiveConnectionCount", "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "Active", color = "#1f77b4" }],
+            ["AWS/ApplicationELB", "NewConnectionCount",    "LoadBalancer", var.alb_arn_suffix, { stat = "Sum", label = "New",    color = "#ff7f0e" }]
+          ]
+          yAxis = { left = { label = "connections", min = 0 } }
+        }
+      },
+
+      # ── CONTEXT: RDS Network & Query Latency ───────────────────────────────
+      {
+        type   = "metric"
+        x      = 16
+        y      = 13
+        width  = 8
+        height = 6
+        properties = {
+          title   = "[Context] RDS Network & Query Latency"
+          region  = data.aws_region.current.name
+          period  = 60
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/RDS", "NetworkReceiveThroughput",  "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network In",        color = "#1f77b4" }],
+            ["AWS/RDS", "NetworkTransmitThroughput", "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Network Out",       color = "#ff7f0e" }],
+            ["AWS/RDS", "ReadLatency",               "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Read Latency (s)",  color = "#2ca02c", yAxis = "right" }],
+            ["AWS/RDS", "WriteLatency",              "DBInstanceIdentifier", var.rds_identifier, { stat = "Average", label = "Write Latency (s)", color = "#d62728", yAxis = "right" }]
+          ]
+          yAxis = {
+            left  = { label = "bytes/sec", min = 0 }
+            right = { label = "seconds",   min = 0 }
+          }
         }
       }
+
     ]
   })
 }
@@ -224,95 +410,9 @@ resource "aws_cloudwatch_log_group" "alb_access" {
   tags              = { Name = "${var.name_prefix}-alb-access-logs" }
 }
 
-# ─── AWS Config for Compliance ────────────────────────────────────────────────
-resource "aws_config_configuration_recorder" "main" {
-  name     = "${var.name_prefix}-recorder"
-  role_arn = aws_iam_role.config.arn
-
-  recording_group {
-    all_supported                 = true
-    include_global_resource_types = true
-  }
-}
-
-resource "aws_iam_role" "config" {
-  name = "${var.name_prefix}-config-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "config.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "config" {
-  role       = aws_iam_role.config.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWS_ConfigRole"
-}
-
-resource "aws_s3_bucket" "config" {
-  bucket        = "${var.name_prefix}-config-${data.aws_caller_identity.current.account_id}"
-  force_destroy = true
-  tags          = { Name = "${var.name_prefix}-config" }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "config" {
-  bucket = aws_s3_bucket.config.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "config" {
-  bucket                  = aws_s3_bucket.config.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_config_delivery_channel" "main" {
-  name           = "${var.name_prefix}-delivery"
-  s3_bucket_name = aws_s3_bucket.config.bucket
-  depends_on     = [aws_config_configuration_recorder.main]
-}
-
-resource "aws_config_configuration_recorder_status" "main" {
-  name       = aws_config_configuration_recorder.main.name
-  is_enabled = true
-  depends_on = [aws_config_delivery_channel.main]
-}
-
-# Managed Config Rules
-resource "aws_config_config_rule" "encrypted_volumes" {
-  name = "${var.name_prefix}-encrypted-volumes"
-  source {
-    owner             = "AWS"
-    source_identifier = "ENCRYPTED_VOLUMES"
-  }
-  depends_on = [aws_config_configuration_recorder_status.main]
-}
-
-resource "aws_config_config_rule" "rds_storage_encrypted" {
-  name = "${var.name_prefix}-rds-storage-encrypted"
-  source {
-    owner             = "AWS"
-    source_identifier = "RDS_STORAGE_ENCRYPTED"
-  }
-  depends_on = [aws_config_configuration_recorder_status.main]
-}
-
-resource "aws_config_config_rule" "iam_password_policy" {
-  name = "${var.name_prefix}-iam-password-policy"
-  source {
-    owner             = "AWS"
-    source_identifier = "IAM_PASSWORD_POLICY"
-  }
-  depends_on = [aws_config_configuration_recorder_status.main]
-}
+# ─── AWS Config: use existing account recorder ────────────────────────────────
+# Config recorder is account-scoped (limit=1). Manage it via the AWS Console
+# or import the existing recorder if you need Terraform to control it.
 
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}

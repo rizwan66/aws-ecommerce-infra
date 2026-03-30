@@ -16,7 +16,7 @@ resource "aws_secretsmanager_secret" "db_password" {
 resource "random_password" "db_password" {
   length           = 24
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  override_special = "!#%&*()-_=+[]{}<>:?"
 }
 
 resource "aws_secretsmanager_secret_version" "db_password" {
@@ -77,11 +77,14 @@ module "ec2" {
   max_size             = var.app_max_size
   target_group_arn     = module.alb.target_group_arn
   iam_instance_profile = module.iam.instance_profile_name
-  db_secret_arn        = aws_secretsmanager_secret.db_password.arn
-  db_endpoint          = module.rds.endpoint
-  redis_endpoint       = module.elasticache.endpoint
-  environment          = var.environment
-  project_name         = var.project_name
+  db_secret_arn         = aws_secretsmanager_secret.db_password.arn
+  db_endpoint           = module.rds.endpoint
+  redis_endpoint        = module.elasticache.endpoint
+  environment           = var.environment
+  project_name          = var.project_name
+  artifacts_bucket_name = aws_s3_bucket.artifacts.bucket
+  alb_arn_suffix        = module.alb.alb_arn_suffix
+  tg_arn_suffix         = module.alb.tg_arn_suffix
 }
 
 # ─── RDS PostgreSQL ───────────────────────────────────────────────────────────

@@ -60,8 +60,8 @@ resource "aws_iam_role_policy" "ec2_custom" {
         Effect = "Allow"
         Action = ["s3:GetObject", "s3:ListBucket"]
         Resource = [
-          "arn:aws:s3:::*-artifacts",
-          "arn:aws:s3:::*-artifacts/*"
+          "arn:aws:s3:::*-artifacts-*",
+          "arn:aws:s3:::*-artifacts-*/*"
         ]
       }
     ]

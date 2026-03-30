@@ -14,6 +14,11 @@ variable "redis_endpoint" { type = string }
 variable "environment" { type = string }
 variable "project_name" { type = string }
 
+variable "artifacts_bucket_name" {
+  description = "S3 bucket name for app artifacts (CI/CD updates)"
+  type        = string
+}
+
 variable "alb_arn_suffix" {
   description = "ALB ARN suffix for request-count scaling"
   type        = string
