@@ -119,11 +119,12 @@ module "elasticache" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  name_prefix     = local.name_prefix
-  asg_name        = module.ec2.asg_name
-  alb_arn_suffix  = module.alb.alb_arn_suffix
-  tg_arn_suffix   = module.alb.tg_arn_suffix
-  rds_identifier  = module.rds.identifier
-  alert_email     = var.alert_email
-  environment     = var.environment
+  name_prefix                      = local.name_prefix
+  asg_name                         = module.ec2.asg_name
+  alb_arn_suffix                   = module.alb.alb_arn_suffix
+  tg_arn_suffix                    = module.alb.tg_arn_suffix
+  rds_identifier                   = module.rds.identifier
+  alert_email                      = var.alert_email
+  environment                      = var.environment
+  elasticache_replication_group_id = module.elasticache.replication_group_id
 }

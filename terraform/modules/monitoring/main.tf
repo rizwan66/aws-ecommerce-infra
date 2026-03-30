@@ -414,5 +414,52 @@ resource "aws_cloudwatch_log_group" "alb_access" {
 # Config recorder is account-scoped (limit=1). Manage it via the AWS Console
 # or import the existing recorder if you need Terraform to control it.
 
+# ─── Alert 6: Redis High Evictions (cache saturation) ─────────────────────────
+resource "aws_cloudwatch_metric_alarm" "redis_evictions" {
+  alarm_name          = "${var.name_prefix}-redis-evictions"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "Evictions"
+  namespace           = "AWS/ElastiCache"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 100
+  alarm_description   = "Redis eviction rate exceeds 100/min — cache memory saturated, consider scaling node type"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    ReplicationGroupId = var.elasticache_replication_group_id
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = { Name = "${var.name_prefix}-redis-evictions-alarm" }
+}
+
+# ─── Alert 7: ALB P99 Latency > 1s (latency SLO breach) ──────────────────────
+resource "aws_cloudwatch_metric_alarm" "alb_latency_p99" {
+  alarm_name          = "${var.name_prefix}-alb-latency-p99"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  extended_statistic  = "p99"
+  metric_name         = "TargetResponseTime"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  threshold           = 1.0
+  alarm_description   = "P99 response time exceeds 1 second for 3 consecutive minutes — latency SLO breach"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = var.alb_arn_suffix
+    TargetGroup  = var.tg_arn_suffix
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = { Name = "${var.name_prefix}-latency-p99-alarm" }
+}
+
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
