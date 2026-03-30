@@ -134,13 +134,12 @@ resource "aws_iam_role_policy" "github_actions" {
           "elasticache:*",
           "cloudwatch:*",
           "logs:*",
-          "iam:PassRole",
-          "secretsmanager:GetSecretValue",
+          "iam:*",
+          "secretsmanager:*",
           "s3:*",
           "config:*",
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:DeleteItem"
+          "sns:*",
+          "dynamodb:*"
         ]
         Resource = "*"
       }
