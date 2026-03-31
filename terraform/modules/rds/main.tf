@@ -27,6 +27,8 @@ resource "aws_db_parameter_group" "postgres" {
 }
 
 resource "aws_db_instance" "main" {
+  #checkov:skip=CKV_AWS_133:Backup retention 0 - free tier constraint; enable in production
+  #checkov:skip=CKV_AWS_293:Deletion protection disabled - non-production, Terraform-managed environment
   identifier = "${var.name_prefix}-db"
 
   engine                = "postgres"

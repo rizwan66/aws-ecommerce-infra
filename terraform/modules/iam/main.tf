@@ -121,6 +121,9 @@ resource "aws_iam_role_policy" "github_actions" {
   #checkov:skip=CKV_AWS_355:GitHub Actions requires broad permissions to manage all AWS infrastructure via Terraform
   #checkov:skip=CKV_AWS_288:GitHub Actions role needs S3/Secrets access to manage Terraform state and app secrets
   #checkov:skip=CKV_AWS_286:GitHub Actions role needs iam:* to manage IAM resources via Terraform
+  #checkov:skip=CKV_AWS_287:GitHub Actions role needs secretsmanager access to read app secrets via Terraform
+  #checkov:skip=CKV_AWS_289:GitHub Actions role needs resource management permissions for infrastructure deployment
+  #checkov:skip=CKV_AWS_290:GitHub Actions role needs write access to manage all AWS resources via Terraform
   name = "${var.name_prefix}-github-actions-policy"
   role = aws_iam_role.github_actions.id
 

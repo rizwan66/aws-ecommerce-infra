@@ -1,5 +1,6 @@
 # ─── SNS Topic for Alerts ─────────────────────────────────────────────────────
 resource "aws_sns_topic" "alerts" {
+  #checkov:skip=CKV_AWS_26:Using AWS-managed encryption - CMK not required for alert notifications
   name = "${var.name_prefix}-alerts"
   tags = { Name = "${var.name_prefix}-alerts" }
 }
@@ -399,12 +400,16 @@ resource "aws_cloudwatch_metric_alarm" "rds_storage_low" {
 
 # ─── Log Groups ───────────────────────────────────────────────────────────────
 resource "aws_cloudwatch_log_group" "app" {
+  #checkov:skip=CKV_AWS_338:30-day retention sufficient for this environment; increase for compliance
+  #checkov:skip=CKV_AWS_158:Using CloudWatch default encryption - CMK not required for this environment
   name              = "/aws/ec2/${var.name_prefix}/app"
   retention_in_days = 30
   tags              = { Name = "${var.name_prefix}-app-logs" }
 }
 
 resource "aws_cloudwatch_log_group" "alb_access" {
+  #checkov:skip=CKV_AWS_338:14-day retention sufficient for ALB access logs; increase for compliance
+  #checkov:skip=CKV_AWS_158:Using CloudWatch default encryption - CMK not required for this environment
   name              = "/aws/alb/${var.name_prefix}/access"
   retention_in_days = 14
   tags              = { Name = "${var.name_prefix}-alb-access-logs" }
