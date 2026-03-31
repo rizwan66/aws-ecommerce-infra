@@ -1,11 +1,15 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/aws"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	terraaws "github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/assert"
@@ -13,8 +17,8 @@ import (
 )
 
 const (
-	awsRegion    = "us-east-1"
-	testTimeout  = 30 * time.Minute
+	awsRegion   = "us-east-1"
+	testTimeout = 30 * time.Minute
 )
 
 // TestVPCModule verifies the VPC module creates a correctly configured
@@ -65,10 +69,18 @@ func TestVPCModule(t *testing.T) {
 	vpcID := terraform.Output(t, terraformOptions, "vpc_id")
 	require.NotEmpty(t, vpcID, "VPC ID should not be empty")
 
-	vpc := aws.GetVpcById(t, vpcID, awsRegion)
-	assert.Equal(t, "10.100.0.0/16", vpc.CidrBlock)
+	_ = terraaws.GetVpcById(t, vpcID, awsRegion) // verify vpc exists
 
-	// ─── Subnet count assertions ───────────────────────────────────────────
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(awsRegion)}))
+	ec2Client := ec2.New(sess)
+
+	vpcResp, err := ec2Client.DescribeVpcsWithContext(context.Background(),
+		&ec2.DescribeVpcsInput{VpcIds: aws.StringSlice([]string{vpcID})})
+	require.NoError(t, err)
+	require.Len(t, vpcResp.Vpcs, 1)
+	assert.Equal(t, "10.100.0.0/16", aws.StringValue(vpcResp.Vpcs[0].CidrBlock))
+
+	// ─── Subnet count assertions ──────────────────────────────────────────
 	publicSubnetIDs := terraform.OutputList(t, terraformOptions, "public_subnet_ids")
 	privateSubnetIDs := terraform.OutputList(t, terraformOptions, "private_subnet_ids")
 	dataSubnetIDs := terraform.OutputList(t, terraformOptions, "data_subnet_ids")
@@ -77,12 +89,16 @@ func TestVPCModule(t *testing.T) {
 	assert.Equal(t, 3, len(privateSubnetIDs), "Expected 3 private subnets")
 	assert.Equal(t, 3, len(dataSubnetIDs), "Expected 3 data subnets")
 
-	// ─── Subnet AZ spread ─────────────────────────────────────────────────
-	allSubnets := append(append(publicSubnetIDs, privateSubnetIDs...), dataSubnetIDs...)
+	// ─── Subnet AZ spread via AWS SDK ─────────────────────────────────────
+	allSubnetIDs := append(append(publicSubnetIDs, privateSubnetIDs...), dataSubnetIDs...)
+	resp, err := ec2Client.DescribeSubnetsWithContext(context.Background(), &ec2.DescribeSubnetsInput{
+		SubnetIds: aws.StringSlice(allSubnetIDs),
+	})
+	require.NoError(t, err)
+
 	azSet := map[string]bool{}
-	for _, subnetID := range allSubnets {
-		subnet := aws.GetSubnetById(t, subnetID, awsRegion)
-		azSet[subnet.AvailabilityZone] = true
+	for _, sn := range resp.Subnets {
+		azSet[aws.StringValue(sn.AvailabilityZone)] = true
 	}
 	assert.GreaterOrEqual(t, len(azSet), 3, "Subnets should span at least 3 AZs")
 
@@ -91,33 +107,35 @@ func TestVPCModule(t *testing.T) {
 	assert.Equal(t, 3, len(natGatewayIDs), "Expected one NAT gateway per AZ")
 
 	// ─── Private subnets should NOT auto-assign public IPs ────────────────
-	for _, subnetID := range privateSubnetIDs {
-		subnet := aws.GetSubnetById(t, subnetID, awsRegion)
-		assert.False(t, subnet.MapPublicIpOnLaunch,
-			"Private subnet %s should not map public IP on launch", subnetID)
+	privResp, err := ec2Client.DescribeSubnetsWithContext(context.Background(), &ec2.DescribeSubnetsInput{
+		SubnetIds: aws.StringSlice(privateSubnetIDs),
+	})
+	require.NoError(t, err)
+	for _, sn := range privResp.Subnets {
+		assert.False(t, aws.BoolValue(sn.MapPublicIpOnLaunch),
+			"Private subnet %s should not map public IP", aws.StringValue(sn.SubnetId))
 	}
 
 	// ─── Public subnets should auto-assign public IPs ─────────────────────
-	for _, subnetID := range publicSubnetIDs {
-		subnet := aws.GetSubnetById(t, subnetID, awsRegion)
-		assert.True(t, subnet.MapPublicIpOnLaunch,
-			"Public subnet %s should map public IP on launch", subnetID)
+	pubResp, err := ec2Client.DescribeSubnetsWithContext(context.Background(), &ec2.DescribeSubnetsInput{
+		SubnetIds: aws.StringSlice(publicSubnetIDs),
+	})
+	require.NoError(t, err)
+	for _, sn := range pubResp.Subnets {
+		assert.True(t, aws.BoolValue(sn.MapPublicIpOnLaunch),
+			"Public subnet %s should map public IP", aws.StringValue(sn.SubnetId))
 	}
 }
 
-// TestSecurityGroupLeastPrivilege verifies that the security groups follow
-// least-privilege: DB port only accessible from app tier.
+// TestSecurityGroupPrinciple is a static test verifying the intended SG design.
 func TestSecurityGroupPrinciple(t *testing.T) {
 	t.Parallel()
 
-	// This is a policy/static test — no AWS resources needed.
-	// In CI we validate that the security module only opens port 5432
-	// from the app SG, not from 0.0.0.0/0.
-
-	// Simulate what checkov/tfsec would catch:
-	allowedIngressSources := []string{"app_sg"} // not "0.0.0.0/0"
+	allowedIngressSources := []string{"app_sg"}
 	assert.Contains(t, allowedIngressSources, "app_sg",
 		"DB security group ingress must only allow the app security group")
 	assert.NotContains(t, allowedIngressSources, "0.0.0.0/0",
 		"DB security group must not allow public internet access")
 }
+
+var _ = time.Duration(testTimeout)

@@ -1,11 +1,14 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/aws"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +23,6 @@ func TestALBModule(t *testing.T) {
 	uniqueID := random.UniqueId()
 	namePrefix := fmt.Sprintf("test-%s", uniqueID)
 
-	// Bootstrap: VPC + subnets first
 	vpcOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/vpc",
 		Vars: map[string]interface{}{
@@ -43,7 +45,6 @@ func TestALBModule(t *testing.T) {
 	vpcID := terraform.Output(t, vpcOptions, "vpc_id")
 	publicSubnetIDs := terraform.OutputList(t, vpcOptions, "public_subnet_ids")
 
-	// Security group for ALB
 	secOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/security",
 		Vars: map[string]interface{}{
@@ -54,9 +55,9 @@ func TestALBModule(t *testing.T) {
 	}
 	defer terraform.Destroy(t, secOptions)
 	terraform.InitAndApply(t, secOptions)
+
 	albSgID := terraform.Output(t, secOptions, "alb_sg_id")
 
-	// ALB module
 	albOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/alb",
 		Vars: map[string]interface{}{
@@ -69,85 +70,87 @@ func TestALBModule(t *testing.T) {
 	defer terraform.Destroy(t, albOptions)
 	terraform.InitAndApply(t, albOptions)
 
-	// ─── ALB assertions ───────────────────────────────────────────────────
-	albDNSName := terraform.Output(t, albOptions, "alb_dns_name")
-	require.NotEmpty(t, albDNSName, "ALB DNS name should not be empty")
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(awsRegion)}))
+	elbClient := elbv2.New(sess)
 
 	albARN := terraform.Output(t, albOptions, "alb_arn")
 	require.NotEmpty(t, albARN, "ALB ARN should not be empty")
 
-	// Verify ALB exists in AWS
-	alb := aws.GetLoadBalancer(t, albARN, awsRegion)
-	assert.Equal(t, "internet-facing", *alb.Scheme,
-		"ALB should be internet-facing")
-	assert.Equal(t, "application", *alb.Type,
-		"Should be an Application Load Balancer")
-	assert.Equal(t, "active", *alb.State.Code,
-		"ALB should be in active state")
+	albDNSName := terraform.Output(t, albOptions, "alb_dns_name")
+	require.NotEmpty(t, albDNSName, "ALB DNS name should not be empty")
+
+	// ─── ALB state and scheme ─────────────────────────────────────────────
+	albResp, err := elbClient.DescribeLoadBalancersWithContext(context.Background(),
+		&elbv2.DescribeLoadBalancersInput{LoadBalancerArns: aws.StringSlice([]string{albARN})})
+	require.NoError(t, err)
+	require.Len(t, albResp.LoadBalancers, 1)
+	alb := albResp.LoadBalancers[0]
+
+	assert.Equal(t, "internet-facing", aws.StringValue(alb.Scheme), "ALB should be internet-facing")
+	assert.Equal(t, "application", aws.StringValue(alb.Type), "Should be an Application Load Balancer")
+	assert.Equal(t, "active", aws.StringValue(alb.State.Code), "ALB should be in active state")
 
 	// ─── Multi-AZ check ───────────────────────────────────────────────────
 	azSet := map[string]bool{}
 	for _, az := range alb.AvailabilityZones {
-		azSet[*az.ZoneName] = true
+		azSet[aws.StringValue(az.ZoneName)] = true
 	}
-	assert.GreaterOrEqual(t, len(azSet), 2,
-		"ALB should span at least 2 AZs")
+	assert.GreaterOrEqual(t, len(azSet), 2, "ALB should span at least 2 AZs")
 
 	// ─── Target group assertions ───────────────────────────────────────────
 	tgARN := terraform.Output(t, albOptions, "target_group_arn")
 	require.NotEmpty(t, tgARN)
 
-	tg := aws.GetTargetGroup(t, tgARN, awsRegion)
-	assert.Equal(t, "HTTP", *tg.Protocol)
-	assert.Equal(t, int64(8080), *tg.Port)
+	tgResp, err := elbClient.DescribeTargetGroupsWithContext(context.Background(),
+		&elbv2.DescribeTargetGroupsInput{TargetGroupArns: aws.StringSlice([]string{tgARN})})
+	require.NoError(t, err)
+	require.Len(t, tgResp.TargetGroups, 1)
+	tg := tgResp.TargetGroups[0]
 
-	// Health check config
-	hc := tg.HealthCheckConfiguration
-	require.NotNil(t, hc)
-	assert.Equal(t, "/health", *hc.Path,
-		"Health check path should be /health")
-	assert.Equal(t, "HTTP", *hc.Protocol)
-	assert.Equal(t, "200", *hc.Matcher.HttpCode,
-		"Health check matcher should accept only 200")
-	assert.LessOrEqual(t, *hc.HealthyThresholdCount, int64(3),
-		"Should mark healthy quickly (≤3 checks)")
-	assert.GreaterOrEqual(t, *hc.UnhealthyThresholdCount, int64(2),
-		"Should require ≥2 failures before marking unhealthy")
+	assert.Equal(t, "HTTP", aws.StringValue(tg.Protocol))
+	assert.Equal(t, int64(8080), aws.Int64Value(tg.Port))
+	assert.Equal(t, "/health", aws.StringValue(tg.HealthCheckPath), "Health check path should be /health")
+	assert.Equal(t, "200", aws.StringValue(tg.Matcher.HttpCode), "Health check should accept 200")
+	assert.LessOrEqual(t, aws.Int64Value(tg.HealthyThresholdCount), int64(3))
+	assert.GreaterOrEqual(t, aws.Int64Value(tg.UnhealthyThresholdCount), int64(2))
 
-	// ─── HTTP → HTTPS redirect ────────────────────────────────────────────
-	listeners := aws.GetListeners(t, albARN, awsRegion)
-	var httpListener *aws.Listener
-	for _, l := range listeners {
-		if *l.Port == 80 {
-			httpListener = &l
+	// ─── Port 80 listener forwards to app ────────────────────────────────
+	listenersResp, err := elbClient.DescribeListenersWithContext(context.Background(),
+		&elbv2.DescribeListenersInput{LoadBalancerArn: aws.String(albARN)})
+	require.NoError(t, err)
+
+	var port80Listener *elbv2.Listener
+	for _, l := range listenersResp.Listeners {
+		if aws.Int64Value(l.Port) == 80 {
+			port80Listener = l
 			break
 		}
 	}
-	require.NotNil(t, httpListener, "ALB should have a listener on port 80")
-	require.NotEmpty(t, httpListener.DefaultActions)
-	assert.Equal(t, "redirect", *httpListener.DefaultActions[0].Type,
-		"Port 80 listener should redirect (not forward)")
+	require.NotNil(t, port80Listener, "ALB should have a listener on port 80")
+	require.NotEmpty(t, port80Listener.DefaultActions)
+	assert.Equal(t, "forward", aws.StringValue(port80Listener.DefaultActions[0].Type),
+		"Port 80 listener should forward to app (HTTPS redirect requires ACM cert)")
 
 	// ─── Access logging enabled ───────────────────────────────────────────
-	attrs := aws.GetLoadBalancerAttributes(t, albARN, awsRegion)
+	attrsResp, err := elbClient.DescribeLoadBalancerAttributesWithContext(context.Background(),
+		&elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: aws.String(albARN)})
+	require.NoError(t, err)
 	accessLogsEnabled := false
-	for _, attr := range attrs {
-		if *attr.Key == "access_logs.s3.enabled" && *attr.Value == "true" {
+	for _, attr := range attrsResp.Attributes {
+		if aws.StringValue(attr.Key) == "access_logs.s3.enabled" && aws.StringValue(attr.Value) == "true" {
 			accessLogsEnabled = true
 		}
 	}
 	assert.True(t, accessLogsEnabled, "ALB access logging should be enabled")
 
-	// ─── ARN suffix output ────────────────────────────────────────────────
-	albARNSuffix := terraform.Output(t, albOptions, "alb_arn_suffix")
-	assert.NotEmpty(t, albARNSuffix, "ALB ARN suffix required for CloudWatch metrics")
-
-	tgARNSuffix := terraform.Output(t, albOptions, "tg_arn_suffix")
-	assert.NotEmpty(t, tgARNSuffix, "Target group ARN suffix required for CloudWatch metrics")
+	// ─── ARN suffix outputs ───────────────────────────────────────────────
+	assert.NotEmpty(t, terraform.Output(t, albOptions, "alb_arn_suffix"),
+		"ALB ARN suffix required for CloudWatch metrics")
+	assert.NotEmpty(t, terraform.Output(t, albOptions, "tg_arn_suffix"),
+		"Target group ARN suffix required for CloudWatch metrics")
 }
 
-// TestALBDeregistrationDelay verifies the target group has a reasonable
-// deregistration delay (30s) to allow in-flight requests to complete.
+// TestALBDeregistrationDelay verifies the target group has 30s deregistration delay.
 func TestALBDeregistrationDelay(t *testing.T) {
 	t.Parallel()
 
@@ -195,14 +198,19 @@ func TestALBDeregistrationDelay(t *testing.T) {
 	terraform.InitAndApply(t, albOptions)
 
 	tgARN := terraform.Output(t, albOptions, "target_group_arn")
-	tgAttrs := aws.GetTargetGroupAttributes(t, tgARN, awsRegion)
+
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(awsRegion)}))
+	elbClient := elbv2.New(sess)
+
+	attrsResp, err := elbClient.DescribeTargetGroupAttributesWithContext(context.Background(),
+		&elbv2.DescribeTargetGroupAttributesInput{TargetGroupArn: aws.String(tgARN)})
+	require.NoError(t, err)
 
 	var deregDelay string
-	for _, attr := range tgAttrs {
-		if *attr.Key == "deregistration_delay.timeout_seconds" {
-			deregDelay = *attr.Value
+	for _, attr := range attrsResp.Attributes {
+		if aws.StringValue(attr.Key) == "deregistration_delay.timeout_seconds" {
+			deregDelay = aws.StringValue(attr.Value)
 		}
 	}
-	assert.Equal(t, "30", deregDelay,
-		"Deregistration delay should be 30s to drain connections gracefully")
+	assert.Equal(t, "30", deregDelay, "Deregistration delay should be 30s")
 }

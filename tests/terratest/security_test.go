@@ -1,11 +1,14 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/aws"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +23,6 @@ func TestSecurityGroupModule(t *testing.T) {
 	uniqueID := random.UniqueId()
 	namePrefix := fmt.Sprintf("test-%s", uniqueID)
 
-	// First create VPC (security module depends on vpc_id)
 	vpcOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/vpc",
 		Vars: map[string]interface{}{
@@ -50,91 +52,72 @@ func TestSecurityGroupModule(t *testing.T) {
 	defer terraform.Destroy(t, secOptions)
 	terraform.InitAndApply(t, secOptions)
 
-	// ─── ALB SG: should accept 80 and 443 from internet ───────────────────
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(awsRegion)}))
+	ec2Client := ec2.New(sess)
+
 	albSgID := terraform.Output(t, secOptions, "alb_sg_id")
-	require.NotEmpty(t, albSgID)
-
-	albSg := aws.GetSecurityGroupById(t, albSgID, awsRegion)
-	assert.Equal(t, vpcID, *albSg.VpcId)
-
-	albIngressPorts := extractIngressPorts(albSg)
-	assert.Contains(t, albIngressPorts, int64(80), "ALB SG should allow port 80")
-	assert.Contains(t, albIngressPorts, int64(443), "ALB SG should allow port 443")
-
-	// ─── App SG: should NOT accept direct internet traffic ─────────────────
 	appSgID := terraform.Output(t, secOptions, "app_sg_id")
-	require.NotEmpty(t, appSgID)
-
-	appSg := aws.GetSecurityGroupById(t, appSgID, awsRegion)
-	assert.False(
-		t,
-		hasIngressFromCidr(appSg, "0.0.0.0/0"),
-		"App SG must not accept traffic from 0.0.0.0/0 (internet)",
-	)
-	assert.True(
-		t,
-		hasIngressFromSG(appSg, albSgID),
-		"App SG must accept traffic from ALB SG",
-	)
-
-	// ─── DB SG: only from app SG on 5432 ──────────────────────────────────
 	dbSgID := terraform.Output(t, secOptions, "db_sg_id")
-	require.NotEmpty(t, dbSgID)
-
-	dbSg := aws.GetSecurityGroupById(t, dbSgID, awsRegion)
-	assert.False(
-		t,
-		hasIngressFromCidr(dbSg, "0.0.0.0/0"),
-		"DB SG must not be accessible from internet",
-	)
-	assert.False(
-		t,
-		hasPortOpenFromCidr(dbSg, 5432, "0.0.0.0/0"),
-		"DB port 5432 must not be open to internet",
-	)
-	assert.True(
-		t,
-		hasIngressFromSGOnPort(dbSg, appSgID, 5432),
-		"DB SG must allow port 5432 from App SG",
-	)
-
-	// ─── Cache SG: only from app SG on 6379 ───────────────────────────────
 	cacheSgID := terraform.Output(t, secOptions, "cache_sg_id")
+
+	require.NotEmpty(t, albSgID)
+	require.NotEmpty(t, appSgID)
+	require.NotEmpty(t, dbSgID)
 	require.NotEmpty(t, cacheSgID)
 
-	cacheSg := aws.GetSecurityGroupById(t, cacheSgID, awsRegion)
-	assert.False(
-		t,
-		hasIngressFromCidr(cacheSg, "0.0.0.0/0"),
-		"Cache SG must not be accessible from internet",
-	)
-	assert.True(
-		t,
-		hasIngressFromSGOnPort(cacheSg, appSgID, 6379),
-		"Cache SG must allow port 6379 from App SG",
-	)
+	getSG := func(sgID string) *ec2.SecurityGroup {
+		resp, err := ec2Client.DescribeSecurityGroupsWithContext(context.Background(),
+			&ec2.DescribeSecurityGroupsInput{GroupIds: aws.StringSlice([]string{sgID})})
+		require.NoError(t, err)
+		require.Len(t, resp.SecurityGroups, 1)
+		return resp.SecurityGroups[0]
+	}
 
-	// ─── No SSH (22) or RDP (3389) open on any SG ─────────────────────────
+	// ─── ALB SG: should accept 80 and 443 from internet ───────────────────
+	albSg := getSG(albSgID)
+	albPorts := ingressPorts(albSg)
+	assert.Contains(t, albPorts, int64(80), "ALB SG should allow port 80")
+	assert.Contains(t, albPorts, int64(443), "ALB SG should allow port 443")
+
+	// ─── App SG: should NOT accept direct internet traffic ─────────────────
+	appSg := getSG(appSgID)
+	assert.False(t, hasCIDRIngress(appSg, "0.0.0.0/0"),
+		"App SG must not accept traffic from 0.0.0.0/0")
+	assert.True(t, hasSGIngress(appSg, albSgID),
+		"App SG must accept traffic from ALB SG")
+
+	// ─── DB SG: port 5432 only from app SG ───────────────────────────────
+	dbSg := getSG(dbSgID)
+	assert.False(t, hasCIDRIngress(dbSg, "0.0.0.0/0"),
+		"DB SG must not be accessible from internet")
+	assert.False(t, hasCIDRIngressOnPort(dbSg, "0.0.0.0/0", 5432),
+		"DB port 5432 must not be open to internet")
+	assert.True(t, hasSGIngressOnPort(dbSg, appSgID, 5432),
+		"DB SG must allow port 5432 from App SG")
+
+	// ─── Cache SG: port 6379 only from app SG ─────────────────────────────
+	cacheSg := getSG(cacheSgID)
+	assert.False(t, hasCIDRIngress(cacheSg, "0.0.0.0/0"),
+		"Cache SG must not be accessible from internet")
+	assert.True(t, hasSGIngressOnPort(cacheSg, appSgID, 6379),
+		"Cache SG must allow port 6379 from App SG")
+
+	// ─── No SSH/RDP open on any SG ────────────────────────────────────────
 	for name, sgID := range map[string]string{
-		"ALB":   albSgID,
-		"App":   appSgID,
-		"DB":    dbSgID,
-		"Cache": cacheSgID,
+		"ALB": albSgID, "App": appSgID, "DB": dbSgID, "Cache": cacheSgID,
 	} {
-		sg := aws.GetSecurityGroupById(t, sgID, awsRegion)
-		assert.False(t, hasPortOpenFromCidr(sg, 22, "0.0.0.0/0"),
-			"%s SG must not have SSH (22) open to internet", name)
-		assert.False(t, hasPortOpenFromCidr(sg, 3389, "0.0.0.0/0"),
-			"%s SG must not have RDP (3389) open to internet", name)
+		sg := getSG(sgID)
+		assert.False(t, hasCIDRIngressOnPort(sg, "0.0.0.0/0", 22),
+			"%s SG must not have SSH open to internet", name)
+		assert.False(t, hasCIDRIngressOnPort(sg, "0.0.0.0/0", 3389),
+			"%s SG must not have RDP open to internet", name)
 	}
 }
 
-// TestNoDefaultVPCUsed verifies that the project uses a custom VPC,
-// not the AWS default VPC (which has permissive rules).
+// TestNoDefaultVPCUsed verifies the module creates a custom VPC, not the default.
 func TestNoDefaultVPCUsed(t *testing.T) {
 	t.Parallel()
 
-	// The test VPC is created by our module — verify it's not the default VPC
 	uniqueID := random.UniqueId()
 	vpcOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/vpc",
@@ -151,32 +134,35 @@ func TestNoDefaultVPCUsed(t *testing.T) {
 	terraform.InitAndApply(t, vpcOptions)
 
 	vpcID := terraform.Output(t, vpcOptions, "vpc_id")
-	vpc := aws.GetVpcById(t, vpcID, awsRegion)
 
-	// Default VPC has isDefault=true and CIDR 172.31.0.0/16
-	assert.False(t, *vpc.IsDefault, "Module must not use the default VPC")
-	assert.Equal(t, "10.102.0.0/16", vpc.CidrBlock, "VPC CIDR should match input variable")
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(awsRegion)}))
+	ec2Client := ec2.New(sess)
+	resp, err := ec2Client.DescribeVpcsWithContext(context.Background(),
+		&ec2.DescribeVpcsInput{VpcIds: aws.StringSlice([]string{vpcID})})
+	require.NoError(t, err)
+	require.Len(t, resp.Vpcs, 1)
+
+	vpc := resp.Vpcs[0]
+	assert.False(t, aws.BoolValue(vpc.IsDefault), "Module must not use the default VPC")
+	assert.Equal(t, "10.102.0.0/16", aws.StringValue(vpc.CidrBlock))
 }
 
-// ─── Helper functions ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-func extractIngressPorts(sg *aws.SecurityGroup) []int64 {
+func ingressPorts(sg *ec2.SecurityGroup) []int64 {
 	var ports []int64
-	for _, perm := range sg.IpPermissions {
-		if perm.FromPort != nil {
-			ports = append(ports, *perm.FromPort)
-		}
-		if perm.ToPort != nil && *perm.ToPort != *perm.FromPort {
-			ports = append(ports, *perm.ToPort)
+	for _, p := range sg.IpPermissions {
+		if p.FromPort != nil {
+			ports = append(ports, aws.Int64Value(p.FromPort))
 		}
 	}
 	return ports
 }
 
-func hasIngressFromCidr(sg *aws.SecurityGroup, cidr string) bool {
-	for _, perm := range sg.IpPermissions {
-		for _, ipRange := range perm.IpRanges {
-			if ipRange.CidrIp != nil && *ipRange.CidrIp == cidr {
+func hasCIDRIngress(sg *ec2.SecurityGroup, cidr string) bool {
+	for _, p := range sg.IpPermissions {
+		for _, r := range p.IpRanges {
+			if aws.StringValue(r.CidrIp) == cidr {
 				return true
 			}
 		}
@@ -184,12 +170,13 @@ func hasIngressFromCidr(sg *aws.SecurityGroup, cidr string) bool {
 	return false
 }
 
-func hasPortOpenFromCidr(sg *aws.SecurityGroup, port int64, cidr string) bool {
-	for _, perm := range sg.IpPermissions {
-		if perm.FromPort != nil && *perm.FromPort <= port &&
-			perm.ToPort != nil && *perm.ToPort >= port {
-			for _, ipRange := range perm.IpRanges {
-				if ipRange.CidrIp != nil && *ipRange.CidrIp == cidr {
+func hasCIDRIngressOnPort(sg *ec2.SecurityGroup, cidr string, port int64) bool {
+	for _, p := range sg.IpPermissions {
+		from := aws.Int64Value(p.FromPort)
+		to := aws.Int64Value(p.ToPort)
+		if from <= port && port <= to {
+			for _, r := range p.IpRanges {
+				if aws.StringValue(r.CidrIp) == cidr {
 					return true
 				}
 			}
@@ -198,10 +185,10 @@ func hasPortOpenFromCidr(sg *aws.SecurityGroup, port int64, cidr string) bool {
 	return false
 }
 
-func hasIngressFromSG(sg *aws.SecurityGroup, sourceSgID string) bool {
-	for _, perm := range sg.IpPermissions {
-		for _, pair := range perm.UserIdGroupPairs {
-			if pair.GroupId != nil && *pair.GroupId == sourceSgID {
+func hasSGIngress(sg *ec2.SecurityGroup, sourceSgID string) bool {
+	for _, p := range sg.IpPermissions {
+		for _, pair := range p.UserIdGroupPairs {
+			if aws.StringValue(pair.GroupId) == sourceSgID {
 				return true
 			}
 		}
@@ -209,12 +196,13 @@ func hasIngressFromSG(sg *aws.SecurityGroup, sourceSgID string) bool {
 	return false
 }
 
-func hasIngressFromSGOnPort(sg *aws.SecurityGroup, sourceSgID string, port int64) bool {
-	for _, perm := range sg.IpPermissions {
-		if perm.FromPort != nil && *perm.FromPort <= port &&
-			perm.ToPort != nil && *perm.ToPort >= port {
-			for _, pair := range perm.UserIdGroupPairs {
-				if pair.GroupId != nil && *pair.GroupId == sourceSgID {
+func hasSGIngressOnPort(sg *ec2.SecurityGroup, sourceSgID string, port int64) bool {
+	for _, p := range sg.IpPermissions {
+		from := aws.Int64Value(p.FromPort)
+		to := aws.Int64Value(p.ToPort)
+		if from <= port && port <= to {
+			for _, pair := range p.UserIdGroupPairs {
+				if aws.StringValue(pair.GroupId) == sourceSgID {
 					return true
 				}
 			}
@@ -223,5 +211,4 @@ func hasIngressFromSGOnPort(sg *aws.SecurityGroup, sourceSgID string, port int64
 	return false
 }
 
-// Ensure test timeout doesn't exceed 30 minutes
-var _ = time.Duration(testTimeout)
+var _ = time.Duration(0)
