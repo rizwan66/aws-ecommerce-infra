@@ -14,6 +14,7 @@ resource "aws_internet_gateway" "main" {
 
 # ─── Public Subnets ───────────────────────────────────────────────────────────
 resource "aws_subnet" "public" {
+  #checkov:skip=CKV_AWS_130:Public subnets require public IPs for ALB and NAT gateway instances
   count                   = length(var.availability_zones)
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidrs[count.index]

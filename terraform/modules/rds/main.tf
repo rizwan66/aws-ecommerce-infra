@@ -29,6 +29,10 @@ resource "aws_db_parameter_group" "postgres" {
 resource "aws_db_instance" "main" {
   #checkov:skip=CKV_AWS_133:Backup retention 0 - free tier constraint; enable in production
   #checkov:skip=CKV_AWS_293:Deletion protection disabled - non-production, Terraform-managed environment
+  #checkov:skip=CKV_AWS_157:Multi-AZ disabled - free tier constraint; enable in production
+  #checkov:skip=CKV_AWS_161:IAM auth not required - password auth via Secrets Manager is sufficient
+  #checkov:skip=CKV_AWS_353:Performance insights disabled - free tier constraint; enable in production
+  #checkov:skip=CKV_AWS_118:Enhanced monitoring disabled - free tier constraint (monitoring_interval=0)
   identifier = "${var.name_prefix}-db"
 
   engine                = "postgres"

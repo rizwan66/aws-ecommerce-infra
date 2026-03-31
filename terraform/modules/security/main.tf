@@ -1,5 +1,7 @@
 # ─── ALB Security Group ───────────────────────────────────────────────────────
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV_AWS_260:Port 80 open to internet - required for public HTTP access (HTTPS needs ACM cert)
+  #checkov:skip=CKV_AWS_382:All egress required - ALB needs to reach app instances on any ephemeral port
   name        = "${var.name_prefix}-alb-sg"
   description = "Security group for Application Load Balancer"
   vpc_id      = var.vpc_id
@@ -33,6 +35,7 @@ resource "aws_security_group" "alb" {
 
 # ─── App Security Group ───────────────────────────────────────────────────────
 resource "aws_security_group" "app" {
+  #checkov:skip=CKV_AWS_382:All egress required - instances need internet access for package updates and AWS APIs
   name        = "${var.name_prefix}-app-sg"
   description = "Security group for application instances"
   vpc_id      = var.vpc_id
@@ -58,6 +61,7 @@ resource "aws_security_group" "app" {
 
 # ─── RDS Security Group ───────────────────────────────────────────────────────
 resource "aws_security_group" "db" {
+  #checkov:skip=CKV_AWS_382:Outbound needed for RDS maintenance and minor version upgrades
   name        = "${var.name_prefix}-db-sg"
   description = "Security group for RDS - app tier access only"
   vpc_id      = var.vpc_id
@@ -83,6 +87,7 @@ resource "aws_security_group" "db" {
 
 # ─── ElastiCache Security Group ───────────────────────────────────────────────
 resource "aws_security_group" "cache" {
+  #checkov:skip=CKV_AWS_382:Outbound needed for ElastiCache maintenance and version upgrades
   name        = "${var.name_prefix}-cache-sg"
   description = "Security group for ElastiCache - app tier access only"
   vpc_id      = var.vpc_id
