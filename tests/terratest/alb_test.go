@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestALBModule(t *testing.T) {
 	t.Parallel()
 
 	uniqueID := random.UniqueId()
-	namePrefix := fmt.Sprintf("test-%s", uniqueID)
+	namePrefix := strings.ToLower(fmt.Sprintf("test-%s", uniqueID))
 
 	vpcOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/vpc",
@@ -164,7 +165,7 @@ func TestALBDeregistrationDelay(t *testing.T) {
 	t.Parallel()
 
 	uniqueID := random.UniqueId()
-	namePrefix := fmt.Sprintf("test-dereg-%s", uniqueID)
+	namePrefix := strings.ToLower(fmt.Sprintf("test-dereg-%s", uniqueID))
 
 	vpcOptions := &terraform.Options{
 		TerraformDir: "../../terraform/modules/vpc",
