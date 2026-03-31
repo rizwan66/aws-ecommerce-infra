@@ -35,6 +35,9 @@ func TestSecurityGroupModule(t *testing.T) {
 			"private_subnet_cidrs": []string{"10.101.11.0/24", "10.101.12.0/24"},
 			"data_subnet_cidrs":    []string{"10.101.21.0/24", "10.101.22.0/24"},
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+		},
 	}
 	defer terraform.Destroy(t, vpcOptions)
 	terraform.InitAndApply(t, vpcOptions)
@@ -47,6 +50,9 @@ func TestSecurityGroupModule(t *testing.T) {
 			"name_prefix": namePrefix,
 			"vpc_id":      vpcID,
 			"vpc_cidr":    "10.101.0.0/16",
+		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, secOptions)
@@ -128,6 +134,9 @@ func TestNoDefaultVPCUsed(t *testing.T) {
 			"public_subnet_cidrs":  []string{"10.102.1.0/24", "10.102.2.0/24"},
 			"private_subnet_cidrs": []string{"10.102.11.0/24", "10.102.12.0/24"},
 			"data_subnet_cidrs":    []string{"10.102.21.0/24", "10.102.22.0/24"},
+		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, vpcOptions)

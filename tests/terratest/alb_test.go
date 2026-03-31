@@ -33,6 +33,9 @@ func TestALBModule(t *testing.T) {
 			"private_subnet_cidrs": []string{"10.103.11.0/24", "10.103.12.0/24"},
 			"data_subnet_cidrs":    []string{"10.103.21.0/24", "10.103.22.0/24"},
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+		},
 		RetryableTerraformErrors: map[string]string{
 			"RequestError: send request failed": "Transient error",
 		},
@@ -52,6 +55,9 @@ func TestALBModule(t *testing.T) {
 			"vpc_id":      vpcID,
 			"vpc_cidr":    "10.103.0.0/16",
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
+		},
 	}
 	defer terraform.Destroy(t, secOptions)
 	terraform.InitAndApply(t, secOptions)
@@ -65,6 +71,9 @@ func TestALBModule(t *testing.T) {
 			"vpc_id":            vpcID,
 			"public_subnet_ids": publicSubnetIDs,
 			"alb_sg_id":         albSgID,
+		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-alb", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, albOptions)
@@ -167,6 +176,9 @@ func TestALBDeregistrationDelay(t *testing.T) {
 			"private_subnet_cidrs": []string{"10.104.11.0/24", "10.104.12.0/24"},
 			"data_subnet_cidrs":    []string{"10.104.21.0/24", "10.104.22.0/24"},
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+		},
 	}
 	defer terraform.Destroy(t, vpcOptions)
 	terraform.InitAndApply(t, vpcOptions)
@@ -181,6 +193,9 @@ func TestALBDeregistrationDelay(t *testing.T) {
 			"vpc_id":      vpcID,
 			"vpc_cidr":    "10.104.0.0/16",
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
+		},
 	}
 	defer terraform.Destroy(t, secOptions)
 	terraform.InitAndApply(t, secOptions)
@@ -192,6 +207,9 @@ func TestALBDeregistrationDelay(t *testing.T) {
 			"vpc_id":            vpcID,
 			"public_subnet_ids": publicSubnetIDs,
 			"alb_sg_id":         terraform.Output(t, secOptions, "alb_sg_id"),
+		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-alb", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, albOptions)

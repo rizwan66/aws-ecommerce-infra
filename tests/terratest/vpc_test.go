@@ -55,6 +55,9 @@ func TestVPCModule(t *testing.T) {
 				"10.100.23.0/24",
 			},
 		},
+		EnvVars: map[string]string{
+			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+		},
 		RetryableTerraformErrors: map[string]string{
 			"RequestError: send request failed": "Transient AWS API error",
 		},
