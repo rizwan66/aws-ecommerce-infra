@@ -4,12 +4,10 @@ Multi-tier Flask app for AWS infrastructure demonstration.
 Displays instance metadata, AZ, health status, and a sample product catalogue.
 """
 import os
-import json
 import time
 import logging
 from datetime import datetime
 
-import boto3
 import redis
 import psycopg2
 from flask import Flask, jsonify, render_template, request
@@ -205,11 +203,11 @@ def metrics():
     """Prometheus-style plain-text metrics endpoint."""
     uptime = int(time.time() - START_TIME)
     lines = [
-        f"# HELP ecommerce_uptime_seconds Application uptime",
-        f"# TYPE ecommerce_uptime_seconds gauge",
+        "# HELP ecommerce_uptime_seconds Application uptime",
+        "# TYPE ecommerce_uptime_seconds gauge",
         f'ecommerce_uptime_seconds{{instance="{INSTANCE_ID}",az="{AZ}",env="{ENVIRONMENT}"}} {uptime}',
-        f"# HELP ecommerce_products_total Total products in catalogue",
-        f"# TYPE ecommerce_products_total gauge",
+        "# HELP ecommerce_products_total Total products in catalogue",
+        "# TYPE ecommerce_products_total gauge",
         f"ecommerce_products_total {len(PRODUCTS)}",
     ]
     return "\n".join(lines) + "\n", 200, {"Content-Type": "text/plain; charset=utf-8"}

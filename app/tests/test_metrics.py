@@ -72,7 +72,7 @@ class TestMetricsEndpoint:
         response = c.get("/metrics")
         lines = response.data.decode().split("\n")
         products_line = next(
-            (l for l in lines if l.startswith("ecommerce_products_total")), None
+            (line for line in lines if line.startswith("ecommerce_products_total")), None
         )
         assert products_line is not None, "ecommerce_products_total metric not found"
         value = products_line.split()[-1]
@@ -84,8 +84,8 @@ class TestMetricsEndpoint:
         response = c.get("/metrics")
         lines = response.data.decode().split("\n")
         uptime_line = next(
-            (l for l in lines
-             if l.startswith("ecommerce_uptime_seconds{") and not l.startswith("#")),
+            (line for line in lines
+             if line.startswith("ecommerce_uptime_seconds{") and not line.startswith("#")),
             None
         )
         assert uptime_line is not None
