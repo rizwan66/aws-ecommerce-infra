@@ -30,7 +30,7 @@ graph TB
     U1 -->|HTTPS| INFRA
     U2 -->|HTTPS API| INFRA
     DEV -->|git push| GH
-    GH -->|terraform apply\nASG refresh| INFRA
+    GH -->|terraform apply + ASG refresh| INFRA
     INFRA -->|CloudWatch alarm| EMAIL
     EMAIL -->|notification| ONCALL
     ONCALL -->|SSM session| INFRA
@@ -154,7 +154,7 @@ graph LR
 ```mermaid
 graph TB
     subgraph GitHub["GitHub Actions (OIDC)"]
-        GH_WF[Workflow Token\nfrom token.actions.githubusercontent.com]
+        GH_WF[Workflow Token - token.actions.githubusercontent.com]
     end
 
     subgraph IAM["IAM"]
@@ -176,10 +176,10 @@ graph TB
     GH_WF -->|AssumeRoleWithWebIdentity| OIDC
     OIDC --> GH_ROLE
     GH_ROLE -->|Full IaC permissions| TF_RESOURCES
-    EC2_ROLE -->|GetSecretValue\n(this ARN only)| SM
-    EC2_ROLE -->|PutMetricData\nPutLogEvents| CW
+    EC2_ROLE -->|GetSecretValue - this ARN only| SM
+    EC2_ROLE -->|PutMetricData + PutLogEvents| CW
     EC2_ROLE -->|Session Manager| SSM_SVC
-    EC2_ROLE -->|GetObject\n(artifacts prefix)| S3
+    EC2_ROLE -->|GetObject - artifacts prefix| S3
     EC2_ROLE -->|DescribeInstances| EC2_SVC
     EC2_ROLE --> EC2_PROFILE
 
