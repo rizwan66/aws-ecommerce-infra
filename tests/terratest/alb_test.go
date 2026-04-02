@@ -29,13 +29,14 @@ func TestALBModule(t *testing.T) {
 		Vars: map[string]interface{}{
 			"name_prefix":          namePrefix,
 			"vpc_cidr":             "10.103.0.0/16",
-			"availability_zones":   []string{"us-east-1a", "us-east-1b"},
-			"public_subnet_cidrs":  []string{"10.103.1.0/24", "10.103.2.0/24"},
-			"private_subnet_cidrs": []string{"10.103.11.0/24", "10.103.12.0/24"},
-			"data_subnet_cidrs":    []string{"10.103.21.0/24", "10.103.22.0/24"},
+			"availability_zones":   []string{"us-east-1a"}, // single AZ to conserve EIP quota
+			"public_subnet_cidrs":  []string{"10.103.1.0/24"},
+			"private_subnet_cidrs": []string{"10.103.11.0/24"},
+			"data_subnet_cidrs":    []string{"10.103.21.0/24"},
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 		RetryableTerraformErrors: map[string]string{
 			"RequestError: send request failed": "Transient error",
@@ -58,6 +59,7 @@ func TestALBModule(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, secOptions)
@@ -75,6 +77,7 @@ func TestALBModule(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-alb", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, albOptions)
@@ -172,13 +175,14 @@ func TestALBDeregistrationDelay(t *testing.T) {
 		Vars: map[string]interface{}{
 			"name_prefix":          namePrefix,
 			"vpc_cidr":             "10.104.0.0/16",
-			"availability_zones":   []string{"us-east-1a", "us-east-1b"},
-			"public_subnet_cidrs":  []string{"10.104.1.0/24", "10.104.2.0/24"},
-			"private_subnet_cidrs": []string{"10.104.11.0/24", "10.104.12.0/24"},
-			"data_subnet_cidrs":    []string{"10.104.21.0/24", "10.104.22.0/24"},
+			"availability_zones":   []string{"us-east-1b"}, // single AZ to conserve EIP quota
+			"public_subnet_cidrs":  []string{"10.104.1.0/24"},
+			"private_subnet_cidrs": []string{"10.104.11.0/24"},
+			"data_subnet_cidrs":    []string{"10.104.21.0/24"},
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, vpcOptions)
@@ -196,6 +200,7 @@ func TestALBDeregistrationDelay(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, secOptions)
@@ -211,6 +216,7 @@ func TestALBDeregistrationDelay(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-alb", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, albOptions)

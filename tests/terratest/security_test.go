@@ -27,16 +27,15 @@ func TestSecurityGroupModule(t *testing.T) {
 		TerraformDir: "../../terraform/modules/vpc",
 		Vars: map[string]interface{}{
 			"name_prefix": namePrefix,
-			"vpc_cidr":    "10.101.0.0/16",
-			"availability_zones": []string{
-				"us-east-1a", "us-east-1b",
-			},
-			"public_subnet_cidrs":  []string{"10.101.1.0/24", "10.101.2.0/24"},
-			"private_subnet_cidrs": []string{"10.101.11.0/24", "10.101.12.0/24"},
-			"data_subnet_cidrs":    []string{"10.101.21.0/24", "10.101.22.0/24"},
+			"vpc_cidr":             "10.101.0.0/16",
+			"availability_zones":   []string{"us-east-1a"}, // single AZ to conserve EIP quota
+			"public_subnet_cidrs":  []string{"10.101.1.0/24"},
+			"private_subnet_cidrs": []string{"10.101.11.0/24"},
+			"data_subnet_cidrs":    []string{"10.101.21.0/24"},
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, vpcOptions)
@@ -53,6 +52,7 @@ func TestSecurityGroupModule(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-sec", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, secOptions)
@@ -130,13 +130,14 @@ func TestNoDefaultVPCUsed(t *testing.T) {
 		Vars: map[string]interface{}{
 			"name_prefix":          fmt.Sprintf("test-%s", uniqueID),
 			"vpc_cidr":             "10.102.0.0/16",
-			"availability_zones":   []string{"us-east-1a", "us-east-1b"},
-			"public_subnet_cidrs":  []string{"10.102.1.0/24", "10.102.2.0/24"},
-			"private_subnet_cidrs": []string{"10.102.11.0/24", "10.102.12.0/24"},
-			"data_subnet_cidrs":    []string{"10.102.21.0/24", "10.102.22.0/24"},
+			"availability_zones":   []string{"us-east-1b"}, // single AZ to conserve EIP quota
+			"public_subnet_cidrs":  []string{"10.102.1.0/24"},
+			"private_subnet_cidrs": []string{"10.102.11.0/24"},
+			"data_subnet_cidrs":    []string{"10.102.21.0/24"},
 		},
 		EnvVars: map[string]string{
 			"TF_DATA_DIR": fmt.Sprintf("/tmp/tfdata-%s-vpc", uniqueID),
+			"TF_PLUGIN_CACHE_DIR": fmt.Sprintf("/tmp/tf-plugin-cache-%s", uniqueID),
 		},
 	}
 	defer terraform.Destroy(t, vpcOptions)
